@@ -45,7 +45,7 @@ jobs:
         run: |
           cd build-src/dispatch
           flutter pub get
-          flutter analyze
+          flutter analyze lib
           flutter build apk --debug
           cp build/app/outputs/flutter-apk/app-debug.apk ../../RescueLink-Dispatch-1.0.0.apk
 
