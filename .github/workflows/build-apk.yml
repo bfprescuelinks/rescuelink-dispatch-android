@@ -24,7 +24,7 @@ jobs:
 
       - name: Prepare Android project
         run: |
-          unzip -q RescueLink-Dispatch-1.1.2-configured.zip -d build-src
+          unzip -q RescueLink-Dispatch-1.1.3-configured.zip -d build-src
           cd build-src/dispatch
           flutter create --platforms=android --org com.rescuelink --project-name dispatch .
           cp google-services.json android/app/google-services.json
@@ -47,10 +47,10 @@ jobs:
           flutter pub get
           flutter analyze lib
           flutter build apk --debug
-          cp build/app/outputs/flutter-apk/app-debug.apk ../../RescueLink-Dispatch-1.1.1.apk
+          cp build/app/outputs/flutter-apk/app-debug.apk ../../RescueLink-Dispatch-1.1.3.apk
 
       - uses: actions/upload-artifact@v4
         with:
           name: RescueLink-Dispatch-Android
-          path: RescueLink-Dispatch-1.1.1.apk
+          path: RescueLink-Dispatch-1.1.3.apk
           if-no-files-found: error
