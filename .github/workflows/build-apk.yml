@@ -1,0 +1,56 @@
+name: Build RescueLink Dispatch APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Restore stable debug signing key
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: rescuelink-dispatch-debug-key-v1
+
+      - name: Prepare Android project
+        run: |
+          unzip -q RescueLink-Dispatch-1.0.0-configured.zip -d build-src
+          cd build-src/dispatch
+          flutter create --platforms=android --org com.rescuelink --project-name dispatch .
+          cp google-services.json android/app/google-services.json
+          sed -i '/id("com.android.application") version/a\    id("com.google.gms.google-services") version "4.4.2" apply false' android/settings.gradle.kts
+          sed -i '/id("com.android.application")$/a\    id("com.google.gms.google-services")' android/app/build.gradle.kts
+          sed -i '/<manifest/a\    <uses-permission android:name="android.permission.INTERNET" />' android/app/src/main/AndroidManifest.xml
+          sed -i 's/android:label="dispatch"/android:label="RescueLink Dispatch"/' android/app/src/main/AndroidManifest.xml
+
+      - name: Create stable debug signing key
+        run: |
+          mkdir -p "$HOME/.android"
+          if [ ! -f "$HOME/.android/debug.keystore" ]; then
+            keytool -genkeypair -v -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          fi
+          keytool -list -v -alias androiddebugkey -keystore "$HOME/.android/debug.keystore" -storepass android -keypass android | grep 'SHA1:'
+
+      - name: Build APK
+        run: |
+          cd build-src/dispatch
+          flutter pub get
+          flutter analyze
+          flutter build apk --debug
+          cp build/app/outputs/flutter-apk/app-debug.apk ../../RescueLink-Dispatch-1.0.0.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RescueLink-Dispatch-Android
+          path: RescueLink-Dispatch-1.0.0.apk
+          if-no-files-found: error
