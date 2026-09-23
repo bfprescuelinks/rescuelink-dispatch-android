@@ -27,6 +27,7 @@ jobs:
           unzip -q RescueLink-Dispatch-1.1.4-configured.zip -d build-src
           cd build-src/dispatch
           flutter create --platforms=android --org com.rescuelink --project-name dispatch .
+          cp ../../src/lib/main.dart lib/main.dart
           cp google-services.json android/app/google-services.json
           cp "$HOME/.android/debug.keystore" android/app/rescuelink-debug.keystore
           cat >> android/app/build.gradle.kts <<'GRADLE'
@@ -91,12 +92,12 @@ jobs:
           flutter pub get
           flutter analyze lib
           flutter build apk --debug
-          cp build/app/outputs/flutter-apk/app-debug.apk ../../RescueLink-Dispatch-1.1.4.apk
+          cp build/app/outputs/flutter-apk/app-debug.apk ../../RescueLink-Dispatch-1.1.5.apk
 
       - name: Verify finished APK signing certificate
         run: |
           set -euo pipefail
-          APK=RescueLink-Dispatch-1.1.4.apk
+          APK=RescueLink-Dispatch-1.1.5.apk
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -1)"
           "$APKSIGNER" verify --print-certs "$APK" | tee /tmp/dispatch-apk-signature.txt
           python3 - <<'PY'
@@ -123,5 +124,5 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: RescueLink-Dispatch-Android
-          path: RescueLink-Dispatch-1.1.4.apk
+          path: RescueLink-Dispatch-1.1.5.apk
           if-no-files-found: error
