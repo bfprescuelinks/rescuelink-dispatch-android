@@ -106,7 +106,7 @@ jobs:
           from pathlib import Path
 
           output = Path("/tmp/dispatch-apk-signature.txt").read_text()
-          match = re.search(r"(?:V2 Signer|Signer #1) certificate SHA-1 digest: ([0-9a-fA-F]+)", output)
+          match = re.search(r"certificate SHA-1 digest: ([0-9a-fA-F]+)", output)
           assert match, "Could not read signed APK SHA-1"
           sha1 = match.group(1).lower()
           with zipfile.ZipFile("RescueLink-Dispatch-1.1.4-configured.zip") as archive:
