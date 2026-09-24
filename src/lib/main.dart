@@ -270,6 +270,11 @@ class _DispatchHomeState extends State<DispatchHome> {
         appBar: AppBar(
           title: const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('RescueLink Dispatch', style: TextStyle(fontWeight: FontWeight.w900)), Text('BFP MOBILE COMMAND', style: TextStyle(fontSize: 9, letterSpacing: 1.4))]),
           actions: [
+            IconButton(tooltip: 'Test sound and vibration', icon: const Icon(Icons.volume_up), onPressed: () async {
+              try { await testDispatchAlert(); } catch (e) {
+                if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Alarm test failed: $e')));
+              }
+            }),
             IconButton(tooltip: 'Allow emergency alerts during Do Not Disturb', icon: const Icon(Icons.notifications_active), onPressed: () async {
               await requestDispatchDndAccess();
               if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enable Do Not Disturb access for RescueLink Dispatch in Android settings.')));
