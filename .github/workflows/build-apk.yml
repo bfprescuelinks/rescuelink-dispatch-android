@@ -44,6 +44,18 @@ jobs:
               }
           }
           GRADLE
+          cat >> android/app/build.gradle.kts <<'GRADLE'
+          android {
+              compileOptions {
+                  isCoreLibraryDesugaringEnabled = true
+                  sourceCompatibility = JavaVersion.VERSION_17
+                  targetCompatibility = JavaVersion.VERSION_17
+              }
+          }
+          dependencies {
+              coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+          }
+          GRADLE
           sed -i '/id("com.android.application") version/a\    id("com.google.gms.google-services") version "4.4.2" apply false' android/settings.gradle.kts
           sed -i '/id("com.android.application")$/a\    id("com.google.gms.google-services")' android/app/build.gradle.kts
           python3 - <<'PY'
