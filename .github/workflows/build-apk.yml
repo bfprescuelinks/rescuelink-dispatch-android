@@ -28,6 +28,8 @@ jobs:
           cd build-src/dispatch
           flutter create --platforms=android --org com.rescuelink --project-name dispatch .
           cp ../../src/lib/main.dart lib/main.dart
+          cp ../../src/lib/dispatch_alerts.dart lib/dispatch_alerts.dart
+          sed -i '/^dependencies:/a\  flutter_foreground_task: ^11.0.3\n  flutter_local_notifications: ^22.3.1\n  flutter_ringtone_player: ^4.0.0+4' pubspec.yaml
           cp google-services.json android/app/google-services.json
           cp "$HOME/.android/debug.keystore" android/app/rescuelink-debug.keystore
           cat >> android/app/build.gradle.kts <<'GRADLE'
@@ -44,7 +46,22 @@ jobs:
           GRADLE
           sed -i '/id("com.android.application") version/a\    id("com.google.gms.google-services") version "4.4.2" apply false' android/settings.gradle.kts
           sed -i '/id("com.android.application")$/a\    id("com.google.gms.google-services")' android/app/build.gradle.kts
-          sed -i '/<manifest/a\    <uses-permission android:name="android.permission.INTERNET" />' android/app/src/main/AndroidManifest.xml
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('android/app/src/main/AndroidManifest.xml')
+          manifest = path.read_text().replace('<manifest', '<manifest', 1)
+          manifest = manifest.replace('<application', '''<uses-permission android:name="android.permission.INTERNET" />
+              <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+              <uses-permission android:name="android.permission.VIBRATE" />
+              <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
+              <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+              <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+              <application''', 1)
+          manifest = manifest.replace('</application>', '''<service android:name="com.pravera.flutter_foreground_task.service.ForegroundService"
+                  android:foregroundServiceType="dataSync" android:exported="false" />
+              </application>''', 1)
+          path.write_text(manifest)
+          PY
           sed -i 's/android:label="dispatch"/android:label="RescueLink Dispatch"/' android/app/src/main/AndroidManifest.xml
 
       - name: Create stable debug signing key
@@ -92,12 +109,12 @@ jobs:
           flutter pub get
           flutter analyze lib
           flutter build apk --debug
-          cp build/app/outputs/flutter-apk/app-debug.apk ../../RescueLink-Dispatch-1.1.5.apk
+          cp build/app/outputs/flutter-apk/app-debug.apk ../../RescueLink-Dispatch-1.1.6.apk
 
       - name: Verify finished APK signing certificate
         run: |
           set -euo pipefail
-          APK=RescueLink-Dispatch-1.1.5.apk
+          APK=RescueLink-Dispatch-1.1.6.apk
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -1)"
           "$APKSIGNER" verify --print-certs "$APK" | tee /tmp/dispatch-apk-signature.txt
           python3 - <<'PY'
@@ -124,5 +141,5 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: RescueLink-Dispatch-Android
-          path: RescueLink-Dispatch-1.1.5.apk
+          path: RescueLink-Dispatch-1.1.6.apk
           if-no-files-found: error
