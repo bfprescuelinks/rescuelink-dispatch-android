@@ -92,7 +92,7 @@ class _SignInScreenState extends State<SignInScreen> {
               child: Padding(
                 padding: const EdgeInsets.all(28),
                 child: Column(mainAxisSize: MainAxisSize.min, children: [
-                  Image.asset('assets/images/bfp_logo.png', width: 105),
+                  Image.asset('assets/images/bfp_logo.png', width: 230),
                   const SizedBox(height: 16),
                   const Text('RescueLink Dispatch', style: TextStyle(fontSize: 27, fontWeight: FontWeight.w900)),
                   const Text('BFP MOBILE COMMAND', style: TextStyle(color: Color(0xffa40e18), fontWeight: FontWeight.w800, letterSpacing: 1.5)),
