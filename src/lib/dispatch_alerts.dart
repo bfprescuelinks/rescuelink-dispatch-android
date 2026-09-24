@@ -9,6 +9,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_ringtone_player/flutter_ringtone_player.dart';
+import 'package:vibration/vibration.dart';
 
 import 'firebase_options.dart';
 
@@ -56,15 +57,46 @@ Future<void> createDispatchAlertChannel() async {
   final plugin = dispatchNotifications.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
   final bypass = await plugin?.hasNotificationPolicyAccess() ?? false;
   await plugin?.createNotificationChannel(AndroidNotificationChannel(
-    bypass ? 'dispatch_incidents_dnd_v3' : 'dispatch_incidents_v3',
+    bypass ? 'dispatch_incidents_dnd_v4' : 'dispatch_incidents_v4',
     'Emergency incidents',
     description: 'New RescueLink incidents needing dispatch.',
     importance: Importance.max,
-    playSound: false,
+    playSound: true,
+    sound: const RawResourceAndroidNotificationSound('dispatch_siren'),
     enableVibration: true,
-    vibrationPattern: Int64List.fromList([0, 700, 300, 700, 300, 700]),
+    vibrationPattern: Int64List.fromList([0, 1200, 300, 1200, 300, 1200, 300, 1200, 300, 1200, 300, 1200, 300, 1200, 300, 1200]),
     bypassDnd: bypass,
   ));
+}
+
+Future<void> playDispatchAlarm() async {
+  // Vibrate independently of notification channel settings. The packaged
+  // siren is also played on Android's alarm stream for silent mode.
+  if (await Vibration.hasVibrator()) {
+    await Vibration.vibrate(pattern: [0, 1200, 300, 1200, 300, 1200, 300, 1200, 300, 1200, 300, 1200, 300, 1200, 300, 1200]);
+  }
+  await FlutterRingtonePlayer().play(fromAsset: 'assets/siren.wav', asAlarm: true, looping: true, volume: 1.0);
+  Timer(const Duration(seconds: 12), () => FlutterRingtonePlayer().stop());
+}
+
+Future<void> testDispatchAlert() async {
+  await requestDispatchPermissions();
+  await createDispatchAlertChannel();
+  final bypass = await dispatchNotifications.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()?.hasNotificationPolicyAccess() ?? false;
+  await dispatchNotifications.show(
+    id: 4512,
+    title: 'RescueLink alarm test',
+    body: 'This is a test of the dispatch sound and vibration.',
+    notificationDetails: NotificationDetails(android: AndroidNotificationDetails(
+      bypass ? 'dispatch_incidents_dnd_v4' : 'dispatch_incidents_v4', 'Emergency incidents',
+      channelDescription: 'New RescueLink incidents needing dispatch.',
+      importance: Importance.max, priority: Priority.max,
+      category: AndroidNotificationCategory.alarm,
+      channelBypassDnd: bypass, enableVibration: true, playSound: true,
+      sound: const RawResourceAndroidNotificationSound('dispatch_siren'),
+    )),
+  );
+  await playDispatchAlarm();
 }
 
 Future<void> startDispatchMonitor() async {
@@ -131,17 +163,17 @@ class DispatchMonitorHandler extends TaskHandler {
             title: 'NEW $type INCIDENT',
             body: '${data['description'] ?? 'Emergency assistance requested'}',
             notificationDetails: NotificationDetails(android: AndroidNotificationDetails(
-              bypass ? 'dispatch_incidents_dnd_v3' : 'dispatch_incidents_v3', 'Emergency incidents',
+              bypass ? 'dispatch_incidents_dnd_v4' : 'dispatch_incidents_v4', 'Emergency incidents',
               channelDescription: 'New RescueLink incidents needing dispatch.',
               importance: Importance.max, priority: Priority.max,
               category: AndroidNotificationCategory.alarm,
-              channelBypassDnd: bypass, enableVibration: true, playSound: false,
+              channelBypassDnd: bypass, enableVibration: true, playSound: true,
+              sound: const RawResourceAndroidNotificationSound('dispatch_siren'),
             )),
           );
           // Alarm audio uses the alarm stream, which can sound in silent mode.
           // Android and device DND settings still decide whether it is allowed.
-          await FlutterRingtonePlayer().play(android: AndroidSounds.alarm, asAlarm: true, looping: false);
-          Timer(const Duration(seconds: 8), () => FlutterRingtonePlayer().stop());
+          await playDispatchAlarm();
         }
       });
     });
