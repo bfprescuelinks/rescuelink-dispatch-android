@@ -17,7 +17,7 @@ final dispatchNotifications = FlutterLocalNotificationsPlugin();
 Future<void> initializeDispatchAlerts() async {
   if (!Platform.isAndroid) return;
   FlutterForegroundTask.initCommunicationPort();
-  await dispatchNotifications.initialize(const InitializationSettings(
+  await dispatchNotifications.initialize(settings: const InitializationSettings(
     android: AndroidInitializationSettings('@mipmap/ic_launcher'),
   ));
   FlutterForegroundTask.init(
@@ -100,7 +100,7 @@ class DispatchMonitorHandler extends TaskHandler {
   @override
   Future<void> onStart(DateTime timestamp, TaskStarter starter) async {
     await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-    await dispatchNotifications.initialize(const InitializationSettings(
+    await dispatchNotifications.initialize(settings: const InitializationSettings(
       android: AndroidInitializationSettings('@mipmap/ic_launcher'),
     ));
     await createDispatchAlertChannel();
@@ -127,10 +127,10 @@ class DispatchMonitorHandler extends TaskHandler {
           final bypass = await dispatchNotifications.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()?.hasNotificationPolicyAccess() ?? false;
           await createDispatchAlertChannel();
           await dispatchNotifications.show(
-            change.doc.id.hashCode & 0x7fffffff,
-            'NEW $type INCIDENT',
-            '${data['description'] ?? 'Emergency assistance requested'}',
-            NotificationDetails(android: AndroidNotificationDetails(
+            id: change.doc.id.hashCode & 0x7fffffff,
+            title: 'NEW $type INCIDENT',
+            body: '${data['description'] ?? 'Emergency assistance requested'}',
+            notificationDetails: NotificationDetails(android: AndroidNotificationDetails(
               bypass ? 'dispatch_incidents_dnd_v3' : 'dispatch_incidents_v3', 'Emergency incidents',
               channelDescription: 'New RescueLink incidents needing dispatch.',
               importance: Importance.max, priority: Priority.max,
