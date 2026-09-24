@@ -29,7 +29,29 @@ jobs:
           flutter create --platforms=android --org com.rescuelink --project-name dispatch .
           cp ../../src/lib/main.dart lib/main.dart
           cp ../../src/lib/dispatch_alerts.dart lib/dispatch_alerts.dart
-          sed -i '/^dependencies:/a\  flutter_foreground_task: ^11.0.3\n  flutter_local_notifications: ^22.3.1\n  flutter_ringtone_player: ^4.0.0+4' pubspec.yaml
+          sed -i '/^dependencies:/a\  flutter_foreground_task: ^11.0.3\n  flutter_local_notifications: ^22.3.1\n  flutter_ringtone_player: ^4.0.0+4\n  vibration: ^3.2.1' pubspec.yaml
+          python3 - <<'PY'
+          from pathlib import Path
+          import math, struct, wave
+          path = Path('pubspec.yaml')
+          spec = path.read_text()
+          assert '\n  assets:\n' in spec, 'Expected Flutter assets declaration'
+          path.write_text(spec.replace('\n  assets:\n', '\n  assets:\n    - assets/siren.wav\n', 1))
+          Path('assets').mkdir(exist_ok=True)
+          with wave.open('assets/siren.wav', 'wb') as sound:
+              sound.setnchannels(1)
+              sound.setsampwidth(2)
+              sound.setframerate(16000)
+              for i in range(16000 * 4):
+                  t = i / 16000
+                  phase = t % 1.6
+                  frequency = 700 if phase < 0.8 else 1050
+                  envelope = min(1, (phase % 0.8) * 30, (0.8 - phase % 0.8) * 30)
+                  sample = int(16000 * envelope * math.sin(2 * math.pi * frequency * t))
+                  sound.writeframesraw(struct.pack('<h', sample))
+          Path('android/app/src/main/res/raw').mkdir(exist_ok=True)
+          Path('android/app/src/main/res/raw/dispatch_siren.wav').write_bytes(Path('assets/siren.wav').read_bytes())
+          PY
           cp google-services.json android/app/google-services.json
           cp "$HOME/.android/debug.keystore" android/app/rescuelink-debug.keystore
           cat >> android/app/build.gradle.kts <<'GRADLE'
@@ -122,12 +144,12 @@ jobs:
           sed -i 's/compileSdkVersion 33/compileSdkVersion 36/' "$HOME/.pub-cache/hosted/pub.dev/flutter_ringtone_player-4.0.0+4/android/build.gradle"
           flutter analyze lib
           flutter build apk --debug
-          cp build/app/outputs/flutter-apk/app-debug.apk ../../RescueLink-Dispatch-1.1.6.apk
+          cp build/app/outputs/flutter-apk/app-debug.apk ../../RescueLink-Dispatch-1.1.7.apk
 
       - name: Verify finished APK signing certificate
         run: |
           set -euo pipefail
-          APK=RescueLink-Dispatch-1.1.6.apk
+          APK=RescueLink-Dispatch-1.1.7.apk
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -1)"
           "$APKSIGNER" verify --print-certs "$APK" | tee /tmp/dispatch-apk-signature.txt
           python3 - <<'PY'
@@ -154,5 +176,5 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: RescueLink-Dispatch-Android
-          path: RescueLink-Dispatch-1.1.6.apk
+          path: RescueLink-Dispatch-1.1.7.apk
           if-no-files-found: error
