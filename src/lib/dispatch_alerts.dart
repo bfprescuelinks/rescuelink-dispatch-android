@@ -63,6 +63,7 @@ Future<void> createDispatchAlertChannel() async {
     importance: Importance.max,
     playSound: true,
     sound: const RawResourceAndroidNotificationSound('dispatch_siren'),
+    audioAttributesUsage: AudioAttributesUsage.alarm,
     enableVibration: true,
     vibrationPattern: Int64List.fromList([0, 1200, 300, 1200, 300, 1200, 300, 1200, 300, 1200, 300, 1200, 300, 1200, 300, 1200]),
     bypassDnd: bypass,
