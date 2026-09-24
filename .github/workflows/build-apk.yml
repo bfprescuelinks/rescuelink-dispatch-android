@@ -29,6 +29,8 @@ jobs:
           flutter create --platforms=android --org com.rescuelink --project-name dispatch .
           cp ../../src/lib/main.dart lib/main.dart
           cp ../../src/lib/dispatch_alerts.dart lib/dispatch_alerts.dart
+          base64 -d ../../dispatch-logo-resources.zip.b64 > /tmp/dispatch-logo-resources.zip
+          unzip -o -q /tmp/dispatch-logo-resources.zip -d .
           sed -i '/^dependencies:/a\  flutter_foreground_task: ^11.0.3\n  flutter_local_notifications: ^22.3.1\n  flutter_ringtone_player: ^4.0.0+4\n  vibration: ^3.2.1' pubspec.yaml
           python3 - <<'PY'
           from pathlib import Path
@@ -144,12 +146,12 @@ jobs:
           sed -i 's/compileSdkVersion 33/compileSdkVersion 36/' "$HOME/.pub-cache/hosted/pub.dev/flutter_ringtone_player-4.0.0+4/android/build.gradle"
           flutter analyze lib
           flutter build apk --debug
-          cp build/app/outputs/flutter-apk/app-debug.apk ../../RescueLink-Dispatch-1.1.7.apk
+          cp build/app/outputs/flutter-apk/app-debug.apk ../../RescueLink-Dispatch-1.1.8.apk
 
       - name: Verify finished APK signing certificate
         run: |
           set -euo pipefail
-          APK=RescueLink-Dispatch-1.1.7.apk
+          APK=RescueLink-Dispatch-1.1.8.apk
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -1)"
           "$APKSIGNER" verify --print-certs "$APK" | tee /tmp/dispatch-apk-signature.txt
           python3 - <<'PY'
@@ -176,5 +178,5 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: RescueLink-Dispatch-Android
-          path: RescueLink-Dispatch-1.1.7.apk
+          path: RescueLink-Dispatch-1.1.8.apk
           if-no-files-found: error
