@@ -11,10 +11,12 @@ import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'firebase_options.dart';
+import 'dispatch_alerts.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await initializeDispatchAlerts();
   runApp(const DispatchApp());
 }
 
@@ -227,6 +229,18 @@ class DispatchHome extends StatefulWidget {
 }
 
 class _DispatchHomeState extends State<DispatchHome> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        await startDispatchMonitor();
+      } catch (e) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Incident monitoring could not start: $e')));
+      }
+    });
+  }
+
   Incident? selected;
   bool history = false;
   final map = MapController();
@@ -255,7 +269,13 @@ class _DispatchHomeState extends State<DispatchHome> {
   Widget build(BuildContext context) => Scaffold(
         appBar: AppBar(
           title: const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('RescueLink Dispatch', style: TextStyle(fontWeight: FontWeight.w900)), Text('BFP MOBILE COMMAND', style: TextStyle(fontSize: 9, letterSpacing: 1.4))]),
-          actions: [IconButton(tooltip: 'Sign out', onPressed: () async { await GoogleSignIn().signOut(); await FirebaseAuth.instance.signOut(); }, icon: const Icon(Icons.logout))],
+          actions: [
+            IconButton(tooltip: 'Allow emergency alerts during Do Not Disturb', icon: const Icon(Icons.notifications_active), onPressed: () async {
+              await requestDispatchDndAccess();
+              if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enable Do Not Disturb access for RescueLink Dispatch in Android settings.')));
+            }),
+            IconButton(tooltip: 'Sign out', onPressed: () async { await stopDispatchMonitor(); await GoogleSignIn().signOut(); await FirebaseAuth.instance.signOut(); }, icon: const Icon(Icons.logout)),
+          ],
         ),
         body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
           stream: FirebaseFirestore.instance.collection('incidents').orderBy('createdAt', descending: true).snapshots(),
