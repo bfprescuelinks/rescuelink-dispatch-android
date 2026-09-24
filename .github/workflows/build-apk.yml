@@ -119,6 +119,7 @@ jobs:
         run: |
           cd build-src/dispatch
           flutter pub get
+          sed -i 's/compileSdkVersion 33/compileSdkVersion 36/' "$HOME/.pub-cache/hosted/pub.dev/flutter_ringtone_player-4.0.0+4/android/build.gradle"
           flutter analyze lib
           flutter build apk --debug
           cp build/app/outputs/flutter-apk/app-debug.apk ../../RescueLink-Dispatch-1.1.6.apk
