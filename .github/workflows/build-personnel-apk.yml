@@ -1,0 +1,185 @@
+name: Build RescueLink Fire Alerts APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'personnel/**'
+      - '.github/workflows/build-personnel-apk.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Restore stable debug signing key
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: rescuelink-dispatch-debug-key-v1
+
+      - name: Prepare Android project
+        run: |
+          unzip -q RescueLink-Dispatch-1.1.4-configured.zip -d build-src
+          cd build-src/dispatch
+          flutter create --platforms=android --org com.rescuelink --project-name dispatch .
+          cp ../../personnel/lib/main.dart lib/main.dart
+          cp ../../src/lib/dispatch_alerts.dart lib/dispatch_alerts.dart
+          sed -i 's/^version:.*/version: 1.2.0+20/' pubspec.yaml
+          sed -i 's/RescueLink Dispatch is monitoring/RescueLink Fire Alerts is monitoring/' lib/dispatch_alerts.dart
+          sed -i '/^dependencies:/a\  flutter_foreground_task: ^11.0.3\n  flutter_local_notifications: ^22.3.1\n  flutter_ringtone_player: ^4.0.0+4\n  vibration: ^3.2.1' pubspec.yaml
+          python3 - <<'PY'
+          from pathlib import Path
+          import math, struct, wave
+          path = Path('pubspec.yaml')
+          spec = path.read_text()
+          assert '\n  assets:\n' in spec, 'Expected Flutter assets declaration'
+          path.write_text(spec.replace('\n  assets:\n', '\n  assets:\n    - assets/siren.wav\n', 1))
+          Path('assets').mkdir(exist_ok=True)
+          with wave.open('assets/siren.wav', 'wb') as sound:
+              sound.setnchannels(1)
+              sound.setsampwidth(2)
+              sound.setframerate(16000)
+              for i in range(16000 * 4):
+                  t = i / 16000
+                  phase = t % 1.6
+                  frequency = 700 if phase < 0.8 else 1050
+                  envelope = min(1, (phase % 0.8) * 30, (0.8 - phase % 0.8) * 30)
+                  sample = int(16000 * envelope * math.sin(2 * math.pi * frequency * t))
+                  sound.writeframesraw(struct.pack('<h', sample))
+          Path('android/app/src/main/res/raw').mkdir(exist_ok=True)
+          Path('android/app/src/main/res/raw/dispatch_siren.wav').write_bytes(Path('assets/siren.wav').read_bytes())
+          PY
+          cp google-services.json android/app/google-services.json
+          cp "$HOME/.android/debug.keystore" android/app/rescuelink-debug.keystore
+          cat >> android/app/build.gradle.kts <<'GRADLE'
+          android {
+              signingConfigs {
+                  getByName("debug") {
+                      storeFile = file("rescuelink-debug.keystore")
+                      storePassword = "android"
+                      keyAlias = "androiddebugkey"
+                      keyPassword = "android"
+                  }
+              }
+          }
+          GRADLE
+          cat >> android/app/build.gradle.kts <<'GRADLE'
+          android {
+              compileOptions {
+                  isCoreLibraryDesugaringEnabled = true
+                  sourceCompatibility = JavaVersion.VERSION_17
+                  targetCompatibility = JavaVersion.VERSION_17
+              }
+          }
+          dependencies {
+              coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+          }
+          GRADLE
+          sed -i '/id("com.android.application") version/a\    id("com.google.gms.google-services") version "4.4.2" apply false' android/settings.gradle.kts
+          sed -i '/id("com.android.application")$/a\    id("com.google.gms.google-services")' android/app/build.gradle.kts
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('android/app/src/main/AndroidManifest.xml')
+          manifest = path.read_text().replace('<manifest', '<manifest', 1)
+          manifest = manifest.replace('<application', '''<uses-permission android:name="android.permission.INTERNET" />
+              <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+              <uses-permission android:name="android.permission.VIBRATE" />
+              <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
+              <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+              <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+              <application''', 1)
+          manifest = manifest.replace('</application>', '''<service android:name="com.pravera.flutter_foreground_task.service.ForegroundService"
+                  android:foregroundServiceType="dataSync" android:exported="false" />
+              </application>''', 1)
+          path.write_text(manifest)
+          PY
+          sed -i 's/android:label="dispatch"/android:label="RescueLink Fire Alerts"/' android/app/src/main/AndroidManifest.xml
+
+      - name: Create stable debug signing key
+        run: |
+          mkdir -p "$HOME/.android"
+          if [ ! -f "$HOME/.android/debug.keystore" ]; then
+            keytool -genkeypair -v -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          fi
+          keytool -list -v -alias androiddebugkey -keystore "$HOME/.android/debug.keystore" -storepass android -keypass android | grep 'SHA1:'
+
+      - name: Verify Firebase Android OAuth registration
+        run: |
+          cd build-src/dispatch
+          python3 - <<'PY'
+          import json
+          import subprocess
+          from pathlib import Path
+
+          package = "com.rescuelink.dispatch"
+          output = subprocess.check_output(
+              ["keytool", "-list", "-v", "-alias", "androiddebugkey",
+               "-keystore", str(Path.home() / ".android/debug.keystore"),
+               "-storepass", "android", "-keypass", "android"],
+              text=True,
+          )
+          sha1 = next(line.split("SHA1:", 1)[1].strip().replace(":", "").lower()
+                      for line in output.splitlines() if "SHA1:" in line)
+          config = json.loads(Path("android/app/google-services.json").read_text())
+          clients = [client for client in config["client"]
+                     if client["client_info"]["android_client_info"]["package_name"] == package]
+          assert len(clients) == 1, f"Firebase config lacks {package}"
+          registered = {oauth["android_info"]["certificate_hash"].lower()
+                        for oauth in clients[0].get("oauth_client", [])
+                        if oauth.get("client_type") == 1}
+          assert sha1 in registered, (
+              f"APK signing SHA-1 {sha1} is not registered for {package}. "
+              "Update Firebase and google-services.json before building."
+          )
+          print(f"Verified {package} signing SHA-1: {sha1}")
+          PY
+
+      - name: Build APK
+        run: |
+          cd build-src/dispatch
+          flutter pub get
+          sed -i 's/compileSdkVersion 33/compileSdkVersion 36/' "$HOME/.pub-cache/hosted/pub.dev/flutter_ringtone_player-4.0.0+4/android/build.gradle"
+          flutter analyze lib
+          flutter build apk --debug
+          cp build/app/outputs/flutter-apk/app-debug.apk ../../RescueLink-Fire-Alerts-1.2.0.apk
+
+      - name: Verify finished APK signing certificate
+        run: |
+          set -euo pipefail
+          APK=RescueLink-Fire-Alerts-1.2.0.apk
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -1)"
+          "$APKSIGNER" verify --print-certs "$APK" | tee /tmp/dispatch-apk-signature.txt
+          python3 - <<'PY'
+          import json
+          import re
+          import zipfile
+          from pathlib import Path
+
+          output = Path("/tmp/dispatch-apk-signature.txt").read_text()
+          match = re.search(r"certificate SHA-1 digest: ([0-9a-fA-F]+)", output)
+          assert match, "Could not read signed APK SHA-1"
+          sha1 = match.group(1).lower()
+          with zipfile.ZipFile("RescueLink-Dispatch-1.1.4-configured.zip") as archive:
+              config = json.loads(archive.read("dispatch/google-services.json"))
+          client = next(c for c in config["client"]
+                        if c["client_info"]["android_client_info"]["package_name"] == "com.rescuelink.dispatch")
+          registered = {oauth["android_info"]["certificate_hash"].lower()
+                        for oauth in client.get("oauth_client", [])
+                        if oauth.get("client_type") == 1}
+          assert sha1 in registered, f"Finished APK SHA-1 {sha1} is not registered in Firebase"
+          print(f"Verified finished APK SHA-1: {sha1}")
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RescueLink-Fire-Alerts-Android
+          path: RescueLink-Fire-Alerts-1.2.0.apk
+          if-no-files-found: error
