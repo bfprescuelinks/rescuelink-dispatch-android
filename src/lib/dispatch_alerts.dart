@@ -157,12 +157,16 @@ class DispatchMonitorHandler extends TaskHandler {
           final data = change.doc.data();
           if (data == null || {'resolved', 'cancelled'}.contains(data['status'])) continue;
           final type = '${data['type'] ?? 'Emergency'}'.toUpperCase();
+          final point = data['location'];
+          final coordinates = point is GeoPoint
+              ? '${point.latitude.toStringAsFixed(5)}, ${point.longitude.toStringAsFixed(5)}'
+              : 'Location unavailable';
           final bypass = await dispatchNotifications.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()?.hasNotificationPolicyAccess() ?? false;
           await createDispatchAlertChannel();
           await dispatchNotifications.show(
             id: change.doc.id.hashCode & 0x7fffffff,
             title: 'NEW $type INCIDENT',
-            body: '${data['description'] ?? 'Emergency assistance requested'}',
+            body: '${data['description'] ?? 'Emergency assistance requested'}\nLocation: $coordinates',
             notificationDetails: NotificationDetails(android: AndroidNotificationDetails(
               bypass ? 'dispatch_incidents_dnd_v4' : 'dispatch_incidents_v4', 'Emergency incidents',
               channelDescription: 'New RescueLink incidents needing dispatch.',
