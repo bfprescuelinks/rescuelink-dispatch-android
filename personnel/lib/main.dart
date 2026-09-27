@@ -91,7 +91,7 @@ class _FireAlertsSignInState extends State<FireAlertsSignIn> {
   @override
   Widget build(BuildContext context) => Scaffold(
     body: SafeArea(child: Center(child: SingleChildScrollView(child: Padding(padding: const EdgeInsets.all(28), child: Column(mainAxisSize: MainAxisSize.min, children: [
-      Image.asset('assets/images/bfp_logo.png', height: 120),
+      Image.asset('assets/images/fire_alert_logo.png', height: 160),
       const SizedBox(height: 20),
       const Text('RescueLink Fire Alerts', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900), textAlign: TextAlign.center),
       const SizedBox(height: 8),
