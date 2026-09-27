@@ -34,7 +34,7 @@ jobs:
           cp ../../src/lib/dispatch_alerts.dart lib/dispatch_alerts.dart
           sed -i 's/^version:.*/version: 1.2.1+21/' pubspec.yaml
           sed -i 's/RescueLink Dispatch is monitoring/RescueLink Fire Alerts is monitoring/' lib/dispatch_alerts.dart
-          sed -i '/^dependencies:/a\  url_launcher: ^6.3.1\n  flutter_foreground_task: ^11.0.3\n  flutter_local_notifications: ^22.3.1\n  flutter_ringtone_player: ^4.0.0+4\n  vibration: ^3.2.1' pubspec.yaml
+          sed -i '/^dependencies:/a\  flutter_foreground_task: ^11.0.3\n  flutter_local_notifications: ^22.3.1\n  flutter_ringtone_player: ^4.0.0+4\n  vibration: ^3.2.1' pubspec.yaml
           python3 - <<'PY'
           from pathlib import Path
           import math, struct, wave
