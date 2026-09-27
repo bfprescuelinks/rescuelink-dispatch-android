@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'dispatch_alerts.dart';
 import 'firebase_options.dart';
@@ -158,18 +159,50 @@ class _FireAlertsHomeState extends State<FireAlertsHome> {
           if (snapshot.hasError) Padding(padding: const EdgeInsets.only(top: 12), child: Text('Unable to read incidents: ${snapshot.error}')),
           if (!snapshot.hasData && !snapshot.hasError) const Center(child: CircularProgressIndicator()),
           if (snapshot.hasData && docs.isEmpty) const Padding(padding: EdgeInsets.all(20), child: Text('No active emergency reports right now.')),
-          for (final doc in docs) Card(child: ListTile(
-            leading: const Icon(Icons.warning_amber_rounded, color: Colors.red),
-            title: Text('${doc.data()['type'] ?? 'Emergency'}'.toUpperCase()),
-            subtitle: Text('${doc.data()['description'] ?? 'Emergency assistance requested'}\n${_time(doc.data()['createdAt'])}'),
-            isThreeLine: true,
-          )),
+          for (final doc in docs) _incidentCard(doc.data()),
           const SizedBox(height: 16),
           const Text('If someone is in immediate danger, call 911. Alerts depend on the phone being online and Android allowing the monitor to run.', textAlign: TextAlign.center),
         ]);
       },
     )),
   );
+
+  Widget _incidentCard(Map<String, dynamic> data) {
+    final point = data['location'];
+    final location = point is GeoPoint
+        ? '${point.latitude.toStringAsFixed(5)}, ${point.longitude.toStringAsFixed(5)}'
+        : null;
+    return Card(child: Padding(
+      padding: const EdgeInsets.all(12),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          const Icon(Icons.warning_amber_rounded, color: Colors.red),
+          const SizedBox(width: 8),
+          Expanded(child: Text('${data['type'] ?? 'Emergency'}'.toUpperCase(),
+              style: const TextStyle(fontWeight: FontWeight.bold))),
+        ]),
+        const SizedBox(height: 8),
+        Text('${data['description'] ?? 'Emergency assistance requested'}'),
+        const SizedBox(height: 8),
+        Text(_time(data['createdAt'])),
+        const SizedBox(height: 8),
+        Text(location == null ? 'Location unavailable' : 'Emergency location: $location'),
+        if (point is GeoPoint) TextButton.icon(
+          onPressed: () async {
+            final uri = Uri.https('www.google.com', '/maps/search/', {
+              'api': '1',
+              'query': '${point.latitude},${point.longitude}',
+            });
+            if (!await launchUrl(uri, mode: LaunchMode.externalApplication) && mounted) {
+              setState(() => error = 'Could not open the emergency location.');
+            }
+          },
+          icon: const Icon(Icons.navigation),
+          label: const Text('NAVIGATE TO EMERGENCY'),
+        ),
+      ]),
+    ));
+  }
 
   String _time(Object? value) => value is Timestamp ? DateFormat('MMM d, h:mm a').format(value.toDate().toLocal()) : 'Time pending';
 }
